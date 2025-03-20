@@ -15,11 +15,11 @@ export const createSkybox = () => {
     // Skybox materials - dark blue similar to Jetpack Joyride background
     const skyBlue = new THREE.MeshBasicMaterial({ color: 0x1a2a40, side: THREE.BackSide });
 
-    // Outside box slightly larger than hallway
+    // Outside box slightly larger than hallway - make it even larger to prevent gaps
     const skyboxGeometry = new THREE.BoxGeometry(
-        HALLWAY_WIDTH + 0.2,
-        HALLWAY_HEIGHT + 0.2,
-        HALLWAY_LENGTH
+        HALLWAY_WIDTH + 2, // Increased from 0.2 to 2 for better coverage
+        HALLWAY_HEIGHT + 2, // Increased from 0.2 to 2 for better coverage
+        HALLWAY_LENGTH + 10 // Add extra length to ensure complete coverage
     );
     const skybox = new THREE.Mesh(skyboxGeometry, skyBlue);
     skybox.position.z = -HALLWAY_LENGTH / 2;
@@ -204,6 +204,23 @@ export const createHallway = () => {
     rightWall.position.z = -HALLWAY_LENGTH / 2;
     rightWall.rotation.y = -Math.PI / 2;
     hallway.add(rightWall);
+
+    // Add end wall at far end of hallway to prevent seeing outside the map
+    const endWallGeometry = new THREE.PlaneGeometry(width, height);
+    const endWall = new THREE.Mesh(endWallGeometry, wallMaterial);
+    endWall.position.x = 0;
+    endWall.position.y = height / 2;
+    endWall.position.z = -HALLWAY_LENGTH; // Position at the far end of the hallway
+    endWall.rotation.y = Math.PI; // Face toward the player
+    hallway.add(endWall);
+
+    // Add an additional wall at the beginning of the hallway (player's starting point)
+    const startWallGeometry = new THREE.PlaneGeometry(width, height);
+    const startWall = new THREE.Mesh(startWallGeometry, wallMaterial);
+    startWall.position.x = 0;
+    startWall.position.y = height / 2;
+    startWall.position.z = 0;
+    hallway.add(startWall);
 
     // Add ambient light to see the environment
     const ambientLight = new THREE.AmbientLight(0x606060, 0.7);

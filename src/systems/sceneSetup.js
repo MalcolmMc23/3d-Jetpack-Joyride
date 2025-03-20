@@ -3,8 +3,8 @@ import { VISIBLE_DISTANCE } from '../constants/gameConstants.js';
 
 // Scene setup
 export const scene = new THREE.Scene();
-// Adjust fog for infinite hallway effect - start fog further away but make it thicker
-scene.fog = new THREE.Fog(0x1a2a40, 80, 150);
+// Adjust fog for infinite hallway effect - make it thicker and start closer
+scene.fog = new THREE.Fog(0x1a2a40, 70, 120);
 
 // Camera setup (first-person view)
 export const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, VISIBLE_DISTANCE);

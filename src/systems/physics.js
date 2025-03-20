@@ -47,18 +47,18 @@ export const updatePlayerPhysics = (player, delta) => {
     }
 
     // Keep player within hallway bounds (horizontal)
-    if (player.position.x < -HALLWAY_WIDTH / 2 + 0.5) {
-        player.position.x = -HALLWAY_WIDTH / 2 + 0.5;
-    } else if (player.position.x > HALLWAY_WIDTH / 2 - 0.5) {
-        player.position.x = HALLWAY_WIDTH / 2 - 0.5;
+    if (player.position.x < -HALLWAY_WIDTH / 2 + 0.52) {
+        player.position.x = -HALLWAY_WIDTH / 2 + 0.52;
+    } else if (player.position.x > HALLWAY_WIDTH / 2 - 0.52) {
+        player.position.x = HALLWAY_WIDTH / 2 - 0.52;
     }
 
     // Keep player within hallway bounds (vertical)
-    if (player.position.y < 0.5) {
-        player.position.y = 0.5;
+    if (player.position.y < 0.52) {
+        player.position.y = 0.52;
         player.velocity = 0;
-    } else if (player.position.y > HALLWAY_HEIGHT - 0.5) {
-        player.position.y = HALLWAY_HEIGHT - 0.5;
+    } else if (player.position.y > HALLWAY_HEIGHT - 0.52) {
+        player.position.y = HALLWAY_HEIGHT - 0.52;
         player.velocity = 0;
     }
 
@@ -137,6 +137,6 @@ export const checkLaserCollision = (laser, delta) => {
     // Distance from player to closest point
     const distance = playerPos.distanceTo(closestPoint);
 
-    // If player is too close to the laser (radius of 0.5)
-    return distance < 0.5;
+    // If player is too close to the laser (radius of 0.52 instead of 0.5)
+    return distance < 0.52;
 }; 

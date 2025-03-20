@@ -110,7 +110,8 @@ export const createLasers = () => {
             angle = Math.random() * Math.PI; // Random angle
 
             // Create a shorter laser to ensure it stays within bounds
-            length = Math.random() * 3 + 3; // Increased length for better visibility
+            // Increased minimum length to ensure laser never appears as just a dot
+            length = Math.random() * 3 + 7; // Increased minimum length from 5 to 7
 
             // Constrain startX to ensure it's not too close to walls - more conservative
             startX = (Math.random() - 0.5) * (HALLWAY_WIDTH - 2 * safeMarginX * 1.5);
@@ -159,7 +160,36 @@ export const createLasers = () => {
                 Math.pow(endX - startX, 2) +
                 Math.pow(endY - startY, 2)
             );
-            length = beamLength;
+
+            // Ensure the beam length is at least 4 units to never appear as just a dot
+            length = Math.max(beamLength, 6);
+
+            // Recalculate endpoint if length was modified
+            if (length > beamLength) {
+                // Extend the endpoint along the same direction
+                const direction = new THREE.Vector2(endX - startX, endY - startY).normalize();
+                endX = startX + direction.x * length;
+                endY = startY + direction.y * length;
+
+                // Re-check boundaries for the new endpoint
+                if (endX < -HALLWAY_WIDTH / 2 + safeMarginX) {
+                    endX = -HALLWAY_WIDTH / 2 + safeMarginX;
+                } else if (endX > HALLWAY_WIDTH / 2 - safeMarginX) {
+                    endX = HALLWAY_WIDTH / 2 - safeMarginX;
+                }
+
+                if (endY < safeMarginY) {
+                    endY = safeMarginY;
+                } else if (endY > HALLWAY_HEIGHT - safeMarginY) {
+                    endY = HALLWAY_HEIGHT - safeMarginY;
+                }
+
+                // Recalculate length and angle with adjusted endpoint
+                const dx = endX - startX;
+                const dy = endY - startY;
+                angle = Math.atan2(dy, dx);
+                length = Math.sqrt(dx * dx + dy * dy);
+            }
         }
 
         // Create laser beam using BoxGeometry instead of cylinder
@@ -183,41 +213,67 @@ export const createLasers = () => {
             laser.rotation.z = angle;
             outerGlow.rotation.z = angle;
         } else {
-            // For diagonal lasers, we need to handle the 3D positioning differently
-            // First place at origin
-            laser.position.set(0, 0, 0);
-            outerGlow.position.set(0, 0, 0);
+            // For diagonal lasers, use a completely different approach
+            // Instead of trying to position a pre-made box geometry, create a custom geometry
+            // that exactly fits between start and end points
 
-            // We need a different approach for diagonal lasers to ensure nodes touch beam ends
-            // Create the beam along the X axis with correct length
-            laser.scale.x = length / laser.geometry.parameters.width;
-            outerGlow.scale.x = length / outerGlow.geometry.parameters.width;
+            // First, clean up any existing geometries
+            if (laser.geometry) laser.geometry.dispose();
+            if (outerGlow.geometry) outerGlow.geometry.dispose();
+
+            // Create a better approach - use a cylinder geometry that we can position precisely
+            // This is inherently better for connecting two points in 3D space
+            const laserRadius = 0.15; // Half of the original 0.3 box height
+            const glowRadius = 0.3;  // Half of the original 0.6 box height
+
+            // Create cylinder geometries with proper segment count for smooth appearance
+            const laserGeometry = new THREE.CylinderGeometry(laserRadius, laserRadius, length, 8);
+            const glowGeometry = new THREE.CylinderGeometry(glowRadius, glowRadius, length, 8);
+
+            // Replace the existing geometries
+            laser.geometry = laserGeometry;
+            outerGlow.geometry = glowGeometry;
+
+            // Reset scales
+            laser.scale.set(1, 1, 1);
+            outerGlow.scale.set(1, 1, 1);
+
+            // Cylinders are created along the Y axis, but we need them along the line between points
+            // Rotate them 90 degrees to align with our desired direction
+            laser.rotation.x = Math.PI / 2;
+            outerGlow.rotation.x = Math.PI / 2;
 
             // Calculate direction vector from start to end
-            const dirVec = new THREE.Vector3(
+            const direction = new THREE.Vector3(
                 endX - startX,
                 endY - startY,
                 endZ - startZ
             ).normalize();
 
-            // Create a temporary object to help with rotation
-            const tempObj = new THREE.Object3D();
-            tempObj.position.set(startX, startY, startZ);
-            tempObj.lookAt(endX, endY, endZ);
+            // Find the midpoint
+            const midpoint = new THREE.Vector3(
+                (startX + endX) / 2,
+                (startY + endY) / 2,
+                (startZ + endZ) / 2
+            );
 
-            // Position the beam at the start point
-            laser.position.copy(tempObj.position);
-            outerGlow.position.copy(tempObj.position);
+            // Position at the midpoint
+            laser.position.copy(midpoint);
+            outerGlow.position.copy(midpoint);
 
-            // Apply rotation to align with direction vector
-            laser.rotation.copy(tempObj.rotation);
-            outerGlow.rotation.copy(tempObj.rotation);
+            // Use quaternion to rotate the cylinder to align with the direction vector
+            // This is more reliable than Euler angles for aligning with arbitrary vectors
+            const quaternion = new THREE.Quaternion();
 
-            // Offset the position to center the beam between the two points
-            // We need to move it half-length along the direction vector
-            const halfLength = length / 2;
-            laser.translateX(halfLength);
-            outerGlow.translateX(halfLength);
+            // Default cylinder direction is (0,1,0) - the Y axis
+            const cylinderDirection = new THREE.Vector3(0, 1, 0);
+
+            // Find the rotation that aligns the cylinder to our beam direction
+            quaternion.setFromUnitVectors(cylinderDirection, direction);
+
+            // Apply the rotation
+            laser.quaternion.copy(quaternion);
+            outerGlow.quaternion.copy(quaternion);
         }
 
         // Create glowing nodes at each end

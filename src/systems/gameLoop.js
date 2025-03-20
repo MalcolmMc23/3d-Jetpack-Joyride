@@ -41,9 +41,233 @@ const updateLasers = (lasers, delta, onCollision) => {
 
 // Handle laser reset with new properties
 const resetLaser = (laser) => {
+    // Reset laser to the beginning of the hallway
     laser.position.z -= HALLWAY_LENGTH;
-    // Reset logic omitted for brevity
-    // (This would be implemented with the original complex reset logic)
+
+    // Get existing children - we'll need to reposition them
+    const laserBeam = laser.children.find(child => child.geometry instanceof THREE.BoxGeometry && child.geometry.parameters.width > 1);
+    const outerGlow = laser.children.find(child => child.geometry instanceof THREE.BoxGeometry && child.geometry.parameters.width !== laserBeam.geometry.parameters.width);
+    const startNode = laser.children.find(child => child.geometry instanceof THREE.SphereGeometry && child.geometry.parameters.radius === 0.4 && child.position.x === laser.userData.startPoint.x);
+    const endNode = laser.children.find(child => child.geometry instanceof THREE.SphereGeometry && child.geometry.parameters.radius === 0.4 && child.position.x === laser.userData.endPoint.x);
+    const startSpike = laser.children.find(child => child.geometry instanceof THREE.SphereGeometry && child.geometry.parameters.radius === 0.7 && child.position.x === laser.userData.startPoint.x);
+    const endSpike = laser.children.find(child => child.geometry instanceof THREE.SphereGeometry && child.geometry.parameters.radius === 0.7 && child.position.x === laser.userData.endPoint.x);
+    const startNodeGlow = laser.children.find(child => child.geometry instanceof THREE.SphereGeometry && child.geometry.parameters.radius === 0.9 && child.position.x === laser.userData.startPoint.x);
+    const endNodeGlow = laser.children.find(child => child.geometry instanceof THREE.SphereGeometry && child.geometry.parameters.radius === 0.9 && child.position.x === laser.userData.endPoint.x);
+
+    // Random parameters for new laser configuration
+    const isFullWidth = Math.random() < 0.3; // 30% chance of full-width laser
+    const isDiagonal = !isFullWidth && Math.random() < 0.3; // 30% chance of diagonal laser (if not full-width)
+
+    // Safe margins
+    const safeMarginX = 1.0;
+    const safeMarginY = 1.0;
+    const safeMarginZ = 3.0;
+
+    let startX, startY, startZ, endX, endY, endZ, angle, length;
+
+    if (isFullWidth) {
+        // Full-width laser logic
+        startY = safeMarginY + Math.random() * (HALLWAY_HEIGHT - 2 * safeMarginY);
+        endY = startY;
+        startX = -HALLWAY_WIDTH / 2 + safeMarginX;
+        endX = HALLWAY_WIDTH / 2 - safeMarginX;
+        startZ = 0;
+        endZ = 0;
+        angle = 0;
+        length = HALLWAY_WIDTH - 2 * safeMarginX;
+    } else if (isDiagonal) {
+        // Diagonal laser logic
+        const centerX = (Math.random() - 0.5) * (HALLWAY_WIDTH - 2 * safeMarginX * 1.5);
+        startX = centerX;
+        startY = safeMarginY + Math.random() * 2;
+        startZ = -safeMarginZ;
+        endX = centerX;
+        endY = HALLWAY_HEIGHT - safeMarginY - Math.random() * 2;
+        endZ = safeMarginZ;
+        length = Math.sqrt(
+            Math.pow(endX - startX, 2) +
+            Math.pow(endY - startY, 2) +
+            Math.pow(endZ - startZ, 2)
+        );
+        angle = Math.atan2(endY - startY, endX - startX);
+    } else {
+        // Regular 2D laser logic
+        angle = Math.random() * Math.PI;
+        length = Math.random() * 3 + 7; // Using increased minimum length from 5 to 7
+
+        startX = (Math.random() - 0.5) * (HALLWAY_WIDTH - 2 * safeMarginX * 1.5);
+        startY = safeMarginY * 1.2 + Math.random() * (HALLWAY_HEIGHT - 2 * safeMarginY * 1.5);
+        startZ = 0;
+
+        endX = startX + Math.cos(angle) * length;
+        endY = startY + Math.sin(angle) * length;
+        endZ = 0;
+
+        // Boundary checks for endpoint
+        if (endX < -HALLWAY_WIDTH / 2 + safeMarginX) {
+            endX = -HALLWAY_WIDTH / 2 + safeMarginX;
+            const dy = endY - startY;
+            const dx = endX - startX;
+            angle = Math.atan2(dy, dx);
+            length = Math.sqrt(dx * dx + dy * dy);
+        } else if (endX > HALLWAY_WIDTH / 2 - safeMarginX) {
+            endX = HALLWAY_WIDTH / 2 - safeMarginX;
+            const dy = endY - startY;
+            const dx = endX - startX;
+            angle = Math.atan2(dy, dx);
+            length = Math.sqrt(dx * dx + dy * dy);
+        }
+
+        if (endY < safeMarginY) {
+            endY = safeMarginY;
+            const dy = endY - startY;
+            const dx = endX - startX;
+            angle = Math.atan2(dy, dx);
+            length = Math.sqrt(dx * dx + dy * dy);
+        } else if (endY > HALLWAY_HEIGHT - safeMarginY) {
+            endY = HALLWAY_HEIGHT - safeMarginY;
+            const dy = endY - startY;
+            const dx = endX - startX;
+            angle = Math.atan2(dy, dx);
+            length = Math.sqrt(dx * dx + dy * dy);
+        }
+
+        // Ensure minimum length for 2D lasers
+        if (!isDiagonal) {
+            const beamLength = Math.sqrt(
+                Math.pow(endX - startX, 2) +
+                Math.pow(endY - startY, 2)
+            );
+
+            // Ensure the beam length is at least 4 units
+            if (beamLength < 6) {
+                length = 6;
+
+                // Extend the endpoint along the same direction
+                const direction = new THREE.Vector2(endX - startX, endY - startY).normalize();
+                endX = startX + direction.x * length;
+                endY = startY + direction.y * length;
+
+                // Re-check boundaries for the new endpoint
+                if (endX < -HALLWAY_WIDTH / 2 + safeMarginX) {
+                    endX = -HALLWAY_WIDTH / 2 + safeMarginX;
+                } else if (endX > HALLWAY_WIDTH / 2 - safeMarginX) {
+                    endX = HALLWAY_WIDTH / 2 - safeMarginX;
+                }
+
+                if (endY < safeMarginY) {
+                    endY = safeMarginY;
+                } else if (endY > HALLWAY_HEIGHT - safeMarginY) {
+                    endY = HALLWAY_HEIGHT - safeMarginY;
+                }
+
+                // Recalculate length and angle with adjusted endpoint
+                const dx = endX - startX;
+                const dy = endY - startY;
+                angle = Math.atan2(dy, dx);
+                length = Math.sqrt(dx * dx + dy * dy);
+            }
+        }
+    }
+
+    // Update laser beam and outer glow
+    if (!isDiagonal) {
+        // Update 2D laser
+        const midX = (startX + endX) / 2;
+        const midY = (startY + endY) / 2;
+
+        // Update laser beam
+        laserBeam.scale.set(1, 1, 1); // Reset scale
+        laserBeam.geometry.dispose();
+        laserBeam.geometry = new THREE.BoxGeometry(length, 0.3, 0.3);
+        laserBeam.position.set(midX, midY, 0);
+        laserBeam.rotation.z = angle;
+
+        // Update outer glow
+        outerGlow.scale.set(1, 1, 1); // Reset scale
+        outerGlow.geometry.dispose();
+        outerGlow.geometry = new THREE.BoxGeometry(length, 0.6, 0.6);
+        outerGlow.position.set(midX, midY, 0);
+        outerGlow.rotation.z = angle;
+    } else {
+        // Update 3D diagonal laser using the new cylinder-based approach
+        // First, clean up any existing geometries
+        laserBeam.geometry.dispose();
+        outerGlow.geometry.dispose();
+
+        // Create cylinder geometries that connect the points precisely
+        const laserRadius = 0.15;
+        const glowRadius = 0.3;
+
+        // Create new geometries with proper segment count
+        const laserGeometry = new THREE.CylinderGeometry(laserRadius, laserRadius, length, 8);
+        const glowGeometry = new THREE.CylinderGeometry(glowRadius, glowRadius, length, 8);
+
+        // Apply new geometries
+        laserBeam.geometry = laserGeometry;
+        outerGlow.geometry = glowGeometry;
+
+        // Reset scales to default
+        laserBeam.scale.set(1, 1, 1);
+        outerGlow.scale.set(1, 1, 1);
+
+        // Rotate 90 degrees to align with direction (cylinders are along Y axis by default)
+        laserBeam.rotation.x = Math.PI / 2;
+        outerGlow.rotation.x = Math.PI / 2;
+
+        // Calculate direction vector from start to end
+        const direction = new THREE.Vector3(
+            endX - startX,
+            endY - startY,
+            endZ - startZ
+        ).normalize();
+
+        // Find midpoint between start and end
+        const midpoint = new THREE.Vector3(
+            (startX + endX) / 2,
+            (startY + endY) / 2,
+            (startZ + endZ) / 2
+        );
+
+        // Position at midpoint
+        laserBeam.position.copy(midpoint);
+        outerGlow.position.copy(midpoint);
+
+        // Use quaternion for precise rotation alignment
+        const quaternion = new THREE.Quaternion();
+
+        // Default cylinder direction is Y axis (0,1,0)
+        const cylinderDirection = new THREE.Vector3(0, 1, 0);
+
+        // Calculate quaternion to rotate from cylinder direction to beam direction
+        quaternion.setFromUnitVectors(cylinderDirection, direction);
+
+        // Apply rotation
+        laserBeam.quaternion.copy(quaternion);
+        outerGlow.quaternion.copy(quaternion);
+    }
+
+    // Update node positions
+    startNode.position.set(startX, startY, startZ);
+    endNode.position.set(endX, endY, endZ);
+
+    // Update spike positions
+    startSpike.position.set(startX, startY, startZ);
+    endSpike.position.set(endX, endY, endZ);
+
+    // Update node glow positions
+    startNodeGlow.position.set(startX, startY, startZ);
+    endNodeGlow.position.set(endX, endY, endZ);
+
+    // Update laser userData for collision detection
+    laser.userData = {
+        startPoint: new THREE.Vector3(startX, startY, startZ),
+        endPoint: new THREE.Vector3(endX, endY, endZ),
+        length: length,
+        angle: isDiagonal ? null : angle,
+        isFullWidth: isFullWidth,
+        isDiagonal: isDiagonal
+    };
 };
 
 // Update environment (hallway and skybox)
