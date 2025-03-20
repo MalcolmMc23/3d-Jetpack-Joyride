@@ -110,7 +110,7 @@ export const createLasers = () => {
             angle = Math.random() * Math.PI; // Random angle
 
             // Create a shorter laser to ensure it stays within bounds
-            length = Math.random() * 2 + 1; // Reduced from 3+2 to 2+1 for better boundary control
+            length = Math.random() * 3 + 3; // Increased length for better visibility
 
             // Constrain startX to ensure it's not too close to walls - more conservative
             startX = (Math.random() - 0.5) * (HALLWAY_WIDTH - 2 * safeMarginX * 1.5);
