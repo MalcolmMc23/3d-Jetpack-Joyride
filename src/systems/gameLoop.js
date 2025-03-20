@@ -5,6 +5,7 @@ import player from '../objects/player.js';
 import { updatePlayerPhysics, checkCoinCollisions, checkLaserCollision } from './physics.js';
 import { updateUI, showGameOver } from './uiManager.js';
 import { GAME_SPEED, HALLWAY_LENGTH, GAME_DURATION } from '../constants/gameConstants.js';
+import { updateWorkers } from '../objects/environment.js';
 
 // Use a clock to ensure consistent timing regardless of framerate
 const clock = new THREE.Clock();
@@ -57,6 +58,9 @@ const updateEnvironment = (hallway, skybox, delta) => {
 
         // Move skybox with hallway
         skybox.position.z = hallway.position.z;
+
+        // Update workers animation
+        updateWorkers(delta);
     }
 };
 
@@ -82,62 +86,74 @@ const updateGodModeCamera = (delta) => {
     if (movement.down) camera.position.addScaledVector(up, -moveSpeed);
 };
 
-// Game update function
+// Update game state for this frame
 export const updateGame = (time, hallway, skybox, coins, lasers, onGameEnd) => {
-    if (!gameState.isGameActive) return;
+    // Calculate time delta in milliseconds
+    const delta = time - (gameState.lastFrameTime || time);
+    gameState.lastFrameTime = time;
 
-    // Calculate delta time for smooth motion regardless of framerate
-    const delta = time - lastTime;
-    lastTime = time;
+    // Normalize delta to match expected framerate (60fps)
+    // This helps maintain consistent speed regardless of actual framerate
+    const normalizedDelta = Math.min(delta, 100) / 16.67;
 
-    // Ensure reasonable delta (in case of very low fps or tab switch)
-    const clampedDelta = Math.min(delta, 33) / 16.67; // 60fps = 16.67ms per frame
-
-    // Always update god mode camera if in god mode, even when paused
-    // This allows free camera movement while the world is frozen
-    updateGodModeCamera(clampedDelta);
-
-    // If the game is paused, don't update anything except god mode camera
-    if (gameState.isPaused) {
-        // Still update UI to show pause status
-        updateUI();
+    // Skip updating if game is paused and not in god mode
+    if (gameState.isPaused && !gameState.isGodMode) {
         return;
     }
 
-    // From here on, we only execute if the game is NOT paused
+    // Update time remaining if game is active
+    if (gameState.isGameActive && !gameState.isPaused) {
+        gameState.timeRemaining -= delta / 1000; // Convert to seconds
 
-    // Update distance with time delta for consistent speed
-    gameState.distance += GAME_SPEED * clampedDelta;
-
-    // Time remaining - don't count down in god mode
-    if (!gameState.isGodMode) {
-        gameState.timeRemaining -= clampedDelta / 60; // Assuming 60 FPS
         if (gameState.timeRemaining <= 0) {
+            // Time's up!
+            gameState.timeRemaining = 0;
+            gameState.isGameActive = false;
             onGameEnd();
-            return;
         }
+
+        // Update distance traveled
+        gameState.distance += GAME_SPEED * normalizedDelta / 10; // Convert to units
     }
 
-    // Player physics - skip if in god mode
-    if (!gameState.isGodMode) {
-        updatePlayerPhysics(player, clampedDelta);
-    }
-
-    // Update environment 
-    updateEnvironment(hallway, skybox, clampedDelta);
-
-    // Coin collection and movement - always run, but skip collection in god mode
-    checkCoinCollisions(coins, clampedDelta, () => {
-        if (!gameState.isGodMode) {
-            gameState.coins++;
-        }
-    });
-
-    // Laser obstacle movement and collision detection
-    updateLasers(lasers, clampedDelta, onGameEnd);
-
-    // Update UI
+    // Update HUD with current game state
     updateUI();
+
+    // Update player
+    if (gameState.isGameActive && !gameState.isPaused) {
+        updatePlayerPhysics(player, normalizedDelta);
+    }
+
+    // Update environment
+    updateEnvironment(hallway, skybox, normalizedDelta);
+
+    // Update coins
+    if (gameState.isGameActive && !gameState.isPaused) {
+        checkCoinCollisions(coins, normalizedDelta, () => {
+            // On coin collection
+            gameState.coins += 1;
+        });
+    }
+
+    // Update lasers/obstacles
+    if (gameState.isGameActive && !gameState.isPaused && !gameState.isGodMode) {
+        updateLasers(lasers, normalizedDelta, () => {
+            // On laser collision
+            gameState.isGameActive = false;
+            onGameEnd();
+        });
+    }
+
+    // Handle camera based on mode
+    if (gameState.isGodMode) {
+        updateGodModeCamera(normalizedDelta);
+    } else {
+        // Use default camera position (follow player)
+        camera.position.x = player.position.x;
+        camera.position.y = player.position.y + 0.7;
+        camera.position.z = player.position.z + 5;
+        camera.lookAt(player.position.x, player.position.y, player.position.z - 10);
+    }
 };
 
 // Animation loop with timestamp
