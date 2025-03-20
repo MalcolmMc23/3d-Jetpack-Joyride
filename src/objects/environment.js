@@ -197,15 +197,6 @@ export const createHallway = () => {
         color: 0xcccccc // Lighter ceiling
     });
 
-    // Emissive blue window material
-    const windowMaterial = new THREE.MeshLambertMaterial({
-        color: 0x74ccf4,
-        transparent: true,
-        opacity: 0.7,
-        emissive: 0x74ccf4,
-        emissiveIntensity: 0.4
-    });
-
     // Door material with texture
     const doorMaterial = new THREE.MeshLambertMaterial({
         map: doorTexture,
@@ -270,104 +261,14 @@ export const createHallway = () => {
         }
     }
 
-    // Use instanced meshes for windows and frames
-    const windowInstanceCount = Math.floor(HALLWAY_LENGTH / WINDOW_SPACING);
-
-    // Left window instances
-    const leftWindowGeometry = new THREE.PlaneGeometry(WINDOW_SIZE, WINDOW_SIZE);
-    const leftWindowInstancedMesh = new THREE.InstancedMesh(
-        leftWindowGeometry,
-        windowMaterial,
-        windowInstanceCount
-    );
-    hallway.add(leftWindowInstancedMesh);
-
-    // Right window instances
-    const rightWindowGeometry = new THREE.PlaneGeometry(WINDOW_SIZE, WINDOW_SIZE);
-    const rightWindowInstancedMesh = new THREE.InstancedMesh(
-        rightWindowGeometry,
-        windowMaterial,
-        windowInstanceCount
-    );
-    hallway.add(rightWindowInstancedMesh);
-
-    // Window frame instances (simplified to just one box per window)
-    const frameGeometry = new THREE.BoxGeometry(WINDOW_SIZE + 0.2, WINDOW_SIZE + 0.2, 0.1);
-    const frameMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 }); // Dark metal frame
-
-    const leftFrameInstancedMesh = new THREE.InstancedMesh(
-        frameGeometry,
-        frameMaterial,
-        windowInstanceCount
-    );
-    hallway.add(leftFrameInstancedMesh);
-
-    const rightFrameInstancedMesh = new THREE.InstancedMesh(
-        frameGeometry,
-        frameMaterial,
-        windowInstanceCount
-    );
-    hallway.add(rightFrameInstancedMesh);
-
-    // Place instances and add only a few key lights
-    const dummy = new THREE.Object3D();
-    const lightPositions = [];
-
-    for (let i = 0; i < windowInstanceCount; i++) {
-        const windowZ = -i * WINDOW_SPACING - WINDOW_SPACING;
-
-        // Left window
-        dummy.position.set(-width / 2 - 0.01, height / 2, windowZ);
-        dummy.rotation.y = Math.PI / 2;
-        dummy.updateMatrix();
-        leftWindowInstancedMesh.setMatrixAt(i, dummy.matrix);
-
-        // Right window
-        dummy.position.set(width / 2 + 0.01, height / 2, windowZ);
-        dummy.rotation.y = -Math.PI / 2;
-        dummy.updateMatrix();
-        rightWindowInstancedMesh.setMatrixAt(i, dummy.matrix);
-
-        // Left frame - move frame slightly away from window to prevent z-fighting
-        dummy.position.set(-width / 2 - 0.1, height / 2, windowZ - 0.05);
-        dummy.rotation.y = Math.PI / 2;
-        dummy.updateMatrix();
-        leftFrameInstancedMesh.setMatrixAt(i, dummy.matrix);
-
-        // Right frame - move frame slightly away from window to prevent z-fighting
-        dummy.position.set(width / 2 + 0.1, height / 2, windowZ - 0.05);
-        dummy.rotation.y = -Math.PI / 2;
-        dummy.updateMatrix();
-        rightFrameInstancedMesh.setMatrixAt(i, dummy.matrix);
-
-        // Only add light for windows close to start
-        if (i < 6) {
-            lightPositions.push({
-                left: new THREE.Vector3(-width / 2 + 0.5, height / 2, windowZ),
-                right: new THREE.Vector3(width / 2 - 0.5, height / 2, windowZ)
-            });
-        }
-    }
-
-    // Add only a few lights - too many lights kills performance
-    lightPositions.forEach(pos => {
-        const leftWindowLight = new THREE.PointLight(0x74ccf4, 0.5, 15);
-        leftWindowLight.position.copy(pos.left);
-        hallway.add(leftWindowLight);
-
-        const rightWindowLight = new THREE.PointLight(0x74ccf4, 0.5, 15);
-        rightWindowLight.position.copy(pos.right);
-        hallway.add(rightWindowLight);
-    });
-
-    // Add ambient light to better see the textures
-    const ambientLight = new THREE.AmbientLight(0x404040, 1);
+    // Add ambient light to see the environment
+    const ambientLight = new THREE.AmbientLight(0x606060, 1);
     hallway.add(ambientLight);
 
-    leftWindowInstancedMesh.instanceMatrix.needsUpdate = true;
-    rightWindowInstancedMesh.instanceMatrix.needsUpdate = true;
-    leftFrameInstancedMesh.instanceMatrix.needsUpdate = true;
-    rightFrameInstancedMesh.instanceMatrix.needsUpdate = true;
+    // Add some directional lighting
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(0, 5, 5);
+    hallway.add(directionalLight);
 
     // Create workers texture
     const workerTexture = createWorkerTexture();
