@@ -157,7 +157,7 @@ export const createHallway = () => {
     const panelTexture = createPanelTexture();
     panelTexture.wrapS = THREE.RepeatWrapping;
     panelTexture.wrapT = THREE.RepeatWrapping;
-    panelTexture.repeat.set(5, 1);
+    panelTexture.repeat.set(20, 1); // Increase repeat to create more panels, enhancing the infinite effect
 
     // Materials
     const wallMaterial = new THREE.MeshLambertMaterial({
@@ -206,13 +206,42 @@ export const createHallway = () => {
     hallway.add(rightWall);
 
     // Add ambient light to see the environment
-    const ambientLight = new THREE.AmbientLight(0x606060, 1);
+    const ambientLight = new THREE.AmbientLight(0x606060, 0.7);
     hallway.add(ambientLight);
 
     // Add some directional lighting
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(0, 5, 5);
     hallway.add(directionalLight);
+
+    // Add receding lights to create depth illusion
+    const lightCount = 20; // Number of lights down the hallway
+    const lightSpacing = HALLWAY_LENGTH / lightCount;
+
+    for (let i = 0; i < lightCount; i++) {
+        // Position lights along the hallway at regular intervals
+        const lightZ = -i * lightSpacing - lightSpacing / 2;
+        const lightIntensity = Math.max(0.1, 1 - (i / lightCount) * 0.8); // Lights get dimmer with distance
+
+        // Ceiling lights
+        const ceilingLight = new THREE.PointLight(0xffffff, lightIntensity, lightSpacing * 2);
+        ceilingLight.position.set(0, height - 0.5, lightZ);
+        hallway.add(ceilingLight);
+
+        // Add light fixtures to ceiling (small cylinders)
+        if (i < lightCount * 0.6) { // Only add fixtures for closer lights to improve performance
+            const fixtureGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.1, 8);
+            const fixtureMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                emissive: 0xffffff,
+                emissiveIntensity: lightIntensity
+            });
+            const fixture = new THREE.Mesh(fixtureGeometry, fixtureMaterial);
+            fixture.position.set(0, height - 0.05, lightZ);
+            fixture.rotation.x = Math.PI / 2;
+            hallway.add(fixture);
+        }
+    }
 
     // Create workers texture
     const workerTexture = createWorkerTexture();

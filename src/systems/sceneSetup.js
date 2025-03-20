@@ -3,11 +3,11 @@ import { VISIBLE_DISTANCE } from '../constants/gameConstants.js';
 
 // Scene setup
 export const scene = new THREE.Scene();
-// Add fog to improve performance (objects fade out in distance)
-scene.fog = new THREE.Fog(0x87CEEB, 10, VISIBLE_DISTANCE);
+// Adjust fog for infinite hallway effect - start fog further away but make it thicker
+scene.fog = new THREE.Fog(0x1a2a40, 80, 150);
 
 // Camera setup (first-person view)
-export const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, VISIBLE_DISTANCE);
+export const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, VISIBLE_DISTANCE);
 camera.position.set(0, 1.7, 0); // Adjusted to standing eye height
 camera.lookAt(0, 1.7, -10);
 
