@@ -1,0 +1,21 @@
+# Dependency directories
+node_modules/
+.npm/
+
+# Parcel build directories
+dist/
+.cache/
+.parcel-cache/
+
+# Environment variables
+.env
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db 

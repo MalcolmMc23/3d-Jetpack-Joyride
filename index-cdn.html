@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jetpack Runner 3D (CDN Version)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.156.1/three.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        .ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            z-index: 10;
+            text-shadow: 1px 1px 2px black;
+        }
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+            z-index: 20;
+        }
+        .retry {
+            background: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            margin-top: 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="ui">
+        <div>Distance: <span id="distance">0</span>m</div>
+        <div>Coins: <span id="coins">0</span></div>
+    </div>
+    <div class="game-over">
+        <h2>Game Over</h2>
+        <div>Distance: <span id="final-distance">0</span>m</div>
+        <div>Coins: <span id="final-coins">0</span></div>
+        <button class="retry">Retry</button>
+    </div>
+    
+    <script>
+        // Game constants
+        const GAME_SPEED = 0.2;
+        const GRAVITY = 0.005;
+        const JUMP_FORCE = 0.15;
+        const TUNNEL_LENGTH = 1000;
+        const COIN_COUNT = 100;
+        const GAME_DURATION = 60; // seconds
+
+        // Game state
+        const state = {
+            distance: 0,
+            coins: 0,
+            isGameActive: false,
+            timeRemaining: GAME_DURATION,
+            isAscending: false
+        };
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // Sky blue
+
+        // Camera setup (first-person view)
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 1, 0);
+        camera.lookAt(0, 1, -10);
+
+        // Renderer setup
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+
+        // Player setup (invisible in first-person view)
+        const player = {
+            velocity: 0,
+            position: new THREE.Vector3(0, 1, 0)
+        };
+
+        // Environment setup (simple tunnel)
+        const createTunnel = () => {
+            const tunnelGeometry = new THREE.CylinderGeometry(10, 10, TUNNEL_LENGTH, 16, 1, true);
+            const tunnelMaterial = new THREE.MeshBasicMaterial({
+                color: 0x666666,
+                side: THREE.BackSide,
+                wireframe: true
+            });
+            const tunnel = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
+            tunnel.rotation.x = Math.PI / 2;
+            tunnel.position.z = -TUNNEL_LENGTH / 2;
+            scene.add(tunnel);
+            return tunnel;
+        };
+
+        // Coins setup
+        const createCoins = () => {
+            const coins = [];
+            const coinGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+            const coinMaterial = new THREE.MeshStandardMaterial({
+                color: 0xFFD700,
+                emissive: 0xFFD700,
+                emissiveIntensity: 0.5
+            });
+            
+            for (let i = 0; i < COIN_COUNT; i++) {
+                const coin = new THREE.Mesh(coinGeometry, coinMaterial);
+                // Position coins at various heights within the tunnel
+                const distance = -(i * (TUNNEL_LENGTH / COIN_COUNT)) - 10;
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.random() * 5 + 1; // Coins between 1 and 6 units from center
+                
+                coin.position.x = Math.cos(angle) * radius;
+                coin.position.y = Math.sin(angle) * radius + 1; // Ensure some coins are reachable
+                coin.position.z = distance;
+                
+                scene.add(coin);
+                coins.push(coin);
+            }
+            
+            return coins;
+        };
+
+        // UI elements
+        const distanceElement = document.getElementById('distance');
+        const coinsElement = document.getElementById('coins');
+        const finalDistanceElement = document.getElementById('final-distance');
+        const finalCoinsElement = document.getElementById('final-coins');
+        const gameOverScreen = document.querySelector('.game-over');
+        const retryButton = document.querySelector('.retry');
+
+        // Game initialization
+        const tunnel = createTunnel();
+        const coins = createCoins();
+
+        // Input handling
+        document.addEventListener('mousedown', () => {
+            state.isAscending = true;
+        });
+
+        document.addEventListener('mouseup', () => {
+            state.isAscending = false;
+        });
+
+        document.addEventListener('touchstart', () => {
+            state.isAscending = true;
+        });
+
+        document.addEventListener('touchend', () => {
+            state.isAscending = false;
+        });
+
+        // Game control functions
+        const startGame = () => {
+            state.distance = 0;
+            state.coins = 0;
+            state.timeRemaining = GAME_DURATION;
+            state.isGameActive = true;
+            gameOverScreen.style.display = 'none';
+            
+            // Reset player position
+            player.position.set(0, 1, 0);
+            player.velocity = 0;
+            
+            // Reset coins
+            coins.forEach((coin, i) => {
+                const distance = -(i * (TUNNEL_LENGTH / COIN_COUNT)) - 10;
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.random() * 5 + 1;
+                
+                coin.position.x = Math.cos(angle) * radius;
+                coin.position.y = Math.sin(angle) * radius + 1;
+                coin.position.z = distance;
+                coin.visible = true;
+            });
+            
+            // Start the animation
+            animate();
+        };
+
+        const endGame = () => {
+            state.isGameActive = false;
+            finalDistanceElement.textContent = Math.floor(state.distance);
+            finalCoinsElement.textContent = state.coins;
+            gameOverScreen.style.display = 'block';
+        };
+
+        // Update UI
+        const updateUI = () => {
+            distanceElement.textContent = Math.floor(state.distance);
+            coinsElement.textContent = state.coins;
+        };
+
+        // Game logic
+        const updateGame = () => {
+            if (!state.isGameActive) return;
+            
+            // Update distance
+            state.distance += GAME_SPEED;
+            
+            // Time remaining
+            state.timeRemaining -= 1/60; // Assuming 60 FPS
+            if (state.timeRemaining <= 0) {
+                endGame();
+                return;
+            }
+            
+            // Player physics (vertical movement only)
+            if (state.isAscending) {
+                player.velocity += JUMP_FORCE;
+            }
+            
+            player.velocity -= GRAVITY;
+            player.position.y += player.velocity;
+            
+            // Keep player within tunnel bounds
+            if (player.position.y < 0.5) {
+                player.position.y = 0.5;
+                player.velocity = 0;
+            } else if (player.position.y > 9) {
+                player.position.y = 9;
+                player.velocity = 0;
+            }
+            
+            // Update camera position (follows player height)
+            camera.position.y = player.position.y;
+            
+            // Move tunnel and check for reset
+            tunnel.position.z += GAME_SPEED;
+            if (tunnel.position.z > TUNNEL_LENGTH / 2) {
+                tunnel.position.z = -TUNNEL_LENGTH / 2;
+            }
+            
+            // Coin collection and movement
+            coins.forEach(coin => {
+                // Move coin with game speed
+                coin.position.z += GAME_SPEED;
+                
+                // Check if coin passed the end of tunnel
+                if (coin.position.z > 10) {
+                    // Reset coin to beginning of tunnel
+                    coin.position.z -= TUNNEL_LENGTH;
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = Math.random() * 5 + 1;
+                    coin.position.x = Math.cos(angle) * radius;
+                    coin.position.y = Math.sin(angle) * radius + 1;
+                    coin.visible = true;
+                }
+                
+                // Check for collection (if coin is near player)
+                if (coin.visible && coin.position.z > -1 && coin.position.z < 1) {
+                    const dx = coin.position.x - camera.position.x;
+                    const dy = coin.position.y - camera.position.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 1) {
+                        coin.visible = false;
+                        state.coins++;
+                    }
+                }
+            });
+            
+            // Update UI
+            updateUI();
+        };
+
+        // Animation loop
+        const animate = () => {
+            if (!state.isGameActive) return;
+            
+            requestAnimationFrame(animate);
+            updateGame();
+            renderer.render(scene, camera);
+        };
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Retry button
+        retryButton.addEventListener('click', startGame);
+
+        // Start the game
+        startGame();
+    </script>
+</body>
+</html> 
