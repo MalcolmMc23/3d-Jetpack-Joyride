@@ -1,5 +1,5 @@
 // Game constants
-export const GAME_SPEED = 0.2; // Reduced from 0.2 for slower game speed
+export const GAME_SPEED = 0.3; // Reduced from 0.2 for slower game speed
 export const GRAVITY = 0.0075;
 export const INITIAL_JETPACK_FORCE = 0.02; // Starting force is very low
 export const MAX_JETPACK_FORCE = 0.25; // Maximum force after acceleration
