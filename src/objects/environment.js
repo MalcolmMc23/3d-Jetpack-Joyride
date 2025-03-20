@@ -73,6 +73,26 @@ const createPanelTexture = () => {
         }
     }
 
+    // Add yellow warning stripe in the middle of the wall
+    context.fillStyle = '#ffcc00'; // Bright yellow
+    const stripeHeight = 20;
+    const stripeY = canvas.height * 0.5 - stripeHeight / 2; // Center the stripe
+    context.fillRect(0, stripeY, canvas.width, stripeHeight);
+
+    // Add black diagonal lines on the yellow stripe
+    context.fillStyle = '#000000';
+    const lineWidth = 8;
+    const lineSpacing = 24;
+    for (let x = -canvas.width; x < canvas.width * 2; x += lineSpacing) {
+        context.beginPath();
+        context.moveTo(x, stripeY);
+        context.lineTo(x + lineWidth + stripeHeight, stripeY + stripeHeight);
+        context.lineTo(x + lineWidth * 2 + stripeHeight, stripeY + stripeHeight);
+        context.lineTo(x + stripeHeight, stripeY);
+        context.closePath();
+        context.fill();
+    }
+
     // Add some subtle highlights
     context.fillStyle = 'rgba(255, 255, 255, 0.05)';
     for (let i = 0; i < 10; i++) {
@@ -85,49 +105,6 @@ const createPanelTexture = () => {
         context.ellipse(x, y, width, height, 0, 0, Math.PI * 2);
         context.fill();
     }
-
-    return new THREE.CanvasTexture(canvas);
-};
-
-// Create door texture similar to the one in Jetpack Joyride
-const createDoorTexture = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
-    const context = canvas.getContext('2d');
-
-    // Dark background
-    context.fillStyle = '#1a1a1a';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Door frame with blue glow
-    context.strokeStyle = '#3399ff';
-    context.lineWidth = 8;
-    context.strokeRect(32, 32, canvas.width - 64, canvas.height - 64);
-
-    // Inner door panels
-    context.fillStyle = '#333333';
-    context.fillRect(64, 64, canvas.width - 128, canvas.height - 128);
-
-    // Cross in the middle
-    context.strokeStyle = '#555555';
-    context.lineWidth = 4;
-    context.beginPath();
-    context.moveTo(canvas.width / 2, 64);
-    context.lineTo(canvas.width / 2, canvas.height - 64);
-    context.moveTo(64, canvas.width / 2);
-    context.lineTo(canvas.width - 64, canvas.width / 2);
-    context.stroke();
-
-    // Add glow effect
-    const gradient = context.createRadialGradient(
-        canvas.width / 2, canvas.height / 2, 50,
-        canvas.width / 2, canvas.height / 2, 150
-    );
-    gradient.addColorStop(0, 'rgba(51, 153, 255, 0.2)');
-    gradient.addColorStop(1, 'rgba(51, 153, 255, 0)');
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, canvas.width, canvas.height);
 
     return new THREE.CanvasTexture(canvas);
 };
@@ -182,9 +159,6 @@ export const createHallway = () => {
     panelTexture.wrapT = THREE.RepeatWrapping;
     panelTexture.repeat.set(5, 1);
 
-    // Create door texture
-    const doorTexture = createDoorTexture();
-
     // Materials
     const wallMaterial = new THREE.MeshLambertMaterial({
         map: panelTexture,
@@ -195,13 +169,6 @@ export const createHallway = () => {
     const ceilingMaterial = new THREE.MeshLambertMaterial({
         map: panelTexture,
         color: 0xcccccc // Lighter ceiling
-    });
-
-    // Door material with texture
-    const doorMaterial = new THREE.MeshLambertMaterial({
-        map: doorTexture,
-        emissive: 0x3399ff,
-        emissiveIntensity: 0.2
     });
 
     // Floor
@@ -237,29 +204,6 @@ export const createHallway = () => {
     rightWall.position.z = -HALLWAY_LENGTH / 2;
     rightWall.rotation.y = -Math.PI / 2;
     hallway.add(rightWall);
-
-    // Add some doors to the walls at intervals
-    const doorCount = Math.floor(HALLWAY_LENGTH / (WINDOW_SPACING * 3)); // Fewer doors than windows
-    const doorGeometry = new THREE.PlaneGeometry(3, 4); // Door size
-
-    for (let i = 0; i < doorCount; i++) {
-        // Position doors along the hallway
-        const doorZ = -i * WINDOW_SPACING * 3 - WINDOW_SPACING * 2;
-
-        // Add door to left wall (alternating)
-        if (i % 2 === 0) {
-            const leftDoor = new THREE.Mesh(doorGeometry, doorMaterial);
-            leftDoor.position.set(-width / 2 - 0.05, height / 2 - 1, doorZ);
-            leftDoor.rotation.y = Math.PI / 2;
-            hallway.add(leftDoor);
-        } else {
-            // Add door to right wall
-            const rightDoor = new THREE.Mesh(doorGeometry, doorMaterial);
-            rightDoor.position.set(width / 2 + 0.05, height / 2 - 1, doorZ);
-            rightDoor.rotation.y = -Math.PI / 2;
-            hallway.add(rightDoor);
-        }
-    }
 
     // Add ambient light to see the environment
     const ambientLight = new THREE.AmbientLight(0x606060, 1);
