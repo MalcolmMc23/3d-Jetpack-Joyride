@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { scene } from '../systems/sceneSetup.js';
+import { scene, camera } from '../systems/sceneSetup.js';
 import {
     HALLWAY_WIDTH,
     HALLWAY_HEIGHT,
@@ -119,25 +119,73 @@ const createWorkerTexture = () => {
     // Clear background (will be transparent)
     context.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw scientist in a hazmat suit (simplified)
-    // Head
-    context.fillStyle = '#ffdbac'; // Skin tone
+    // Draw character inspired by Jetpack Joyride
+    // Helper function for shading
+    const drawWithShading = (x, y, width, height, baseColor, shadeColor, lightX = 0) => {
+        // Base color
+        context.fillStyle = baseColor;
+        context.fillRect(x, y, width, height);
+
+        // Add shading for 3D effect
+        const gradient = context.createLinearGradient(x + lightX, y, x + width, y);
+        gradient.addColorStop(0, 'rgba(255,255,255,0.2)'); // Highlight
+        gradient.addColorStop(0.5, 'rgba(0,0,0,0)');       // Mid tone
+        gradient.addColorStop(1, 'rgba(0,0,0,0.3)');       // Shadow
+
+        context.fillStyle = gradient;
+        context.fillRect(x, y, width, height);
+
+        // Add outline
+        context.strokeStyle = shadeColor;
+        context.lineWidth = 1;
+        context.strokeRect(x, y, width, height);
+    };
+
+    // Head - white/light gray helmet with dark visor
+    context.fillStyle = '#e8e8e0'; // Light gray for helmet
     context.beginPath();
-    context.arc(32, 20, 8, 0, Math.PI * 2);
+    context.arc(32, 20, 9, 0, Math.PI * 2);
     context.fill();
 
-    // Body (hazmat suit - yellowish)
-    context.fillStyle = '#f0e68c'; // Light yellow
-    context.fillRect(26, 28, 12, 20); // Torso
-    context.fillRect(26, 48, 4, 14); // Left leg
-    context.fillRect(34, 48, 4, 14); // Right leg
-    context.fillRect(22, 30, 4, 16); // Left arm
-    context.fillRect(38, 30, 4, 16); // Right arm
+    // Add shading to helmet
+    const helmetGradient = context.createRadialGradient(30, 18, 1, 32, 20, 9);
+    helmetGradient.addColorStop(0, 'rgba(255,255,255,0.8)');
+    helmetGradient.addColorStop(1, 'rgba(0,0,0,0.2)');
+    context.fillStyle = helmetGradient;
+    context.beginPath();
+    context.arc(32, 20, 9, 0, Math.PI * 2);
+    context.fill();
 
-    // Hazmat suit details
-    context.strokeStyle = '#daa520'; // Darker yellow for details
+    // Helmet outline
+    context.strokeStyle = '#aaaaaa';
     context.lineWidth = 1;
-    context.strokeRect(26, 28, 12, 20); // Torso outline
+    context.beginPath();
+    context.arc(32, 20, 9, 0, Math.PI * 2);
+    context.stroke();
+
+    // Visor (dark blue)
+    context.fillStyle = '#6a89cc';
+    context.fillRect(28, 18, 8, 4);
+
+    // Visor shine
+    const visorGradient = context.createLinearGradient(28, 18, 36, 22);
+    visorGradient.addColorStop(0, 'rgba(255,255,255,0.7)');
+    visorGradient.addColorStop(1, 'rgba(0,0,0,0)');
+    context.fillStyle = visorGradient;
+    context.fillRect(28, 18, 8, 4);
+
+    // Body (yellowish) with 3D shading
+    drawWithShading(26, 28, 12, 20, '#f0e68c', '#daa520', 3);
+
+    // Jetpack (golden yellow) with 3D shading
+    drawWithShading(24, 30, 6, 16, '#ffd700', '#b8860b', 1);
+
+    // Legs with 3D shading
+    drawWithShading(26, 48, 4, 14, '#f0e68c', '#daa520', 1); // Left leg
+    drawWithShading(34, 48, 4, 14, '#f0e68c', '#daa520', 1); // Right leg
+
+    // Arms with 3D shading
+    drawWithShading(38, 30, 4, 16, '#f0e68c', '#daa520', 1); // Right arm
 
     return new THREE.CanvasTexture(canvas);
 };
@@ -270,8 +318,8 @@ export const createHallway = () => {
 
     // Add workers along the floor
     const workerCount = 20; // Number of workers to add
-    const workerGeometry = new THREE.PlaneGeometry(1.2, 2); // Worker size
 
+    // Create actual 3D models instead of sprites
     // Clear previous workers array
     workers = [];
 
@@ -279,20 +327,141 @@ export const createHallway = () => {
         const workerZ = -i * WINDOW_SPACING * 1.5 - WINDOW_SPACING; // Space them out
         const workerX = (Math.random() - 0.5) * (width - 1.5); // Random position across width
 
-        const worker = new THREE.Mesh(workerGeometry, workerMaterial);
-        worker.position.set(workerX, 1, workerZ); // Position at floor level
-        worker.rotation.y = Math.random() > 0.5 ? 0 : Math.PI; // Random initial direction
+        // Create a group for the worker
+        const workerGroup = new THREE.Group();
+        workerGroup.position.set(workerX, 0, workerZ); // Set y=0 to place on floor
+
+        // Create a 3D model for the worker
+        // Body - main box
+        const bodyGeometry = new THREE.BoxGeometry(0.6, 1.2, 0.3);
+        const bodyMaterial = new THREE.MeshPhongMaterial({
+            color: 0xf0e68c,
+            specular: 0x111111,
+            shininess: 30
+        });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.position.y = 0.6; // Center of the box is at half its height
+        workerGroup.add(body);
+
+        // Head - sphere
+        const headGeometry = new THREE.SphereGeometry(0.25, 16, 16);
+        const headMaterial = new THREE.MeshPhongMaterial({
+            color: 0xe8e8e0,
+            specular: 0x333333,
+            shininess: 50
+        });
+        const head = new THREE.Mesh(headGeometry, headMaterial);
+        head.position.y = 1.35; // Above the body
+        workerGroup.add(head);
+
+        // Visor
+        const visorGeometry = new THREE.BoxGeometry(0.3, 0.1, 0.2);
+        const visorMaterial = new THREE.MeshPhongMaterial({
+            color: 0x6a89cc,
+            transparent: true,
+            opacity: 0.8,
+            specular: 0xffffff,
+            shininess: 100,
+            emissive: 0x3a59ac,
+            emissiveIntensity: 0.3
+        });
+        const visor = new THREE.Mesh(visorGeometry, visorMaterial);
+        visor.position.y = 1.35;
+        visor.position.z = 0.15;
+        workerGroup.add(visor);
+
+        // Jetpack
+        const jetpackGeometry = new THREE.BoxGeometry(0.3, 0.6, 0.2);
+        const jetpackMaterial = new THREE.MeshPhongMaterial({
+            color: 0xffd700,
+            specular: 0xffaa00,
+            shininess: 80
+        });
+        const jetpack = new THREE.Mesh(jetpackGeometry, jetpackMaterial);
+        jetpack.position.y = 0.7;
+        jetpack.position.z = -0.25;
+        workerGroup.add(jetpack);
+
+        // Jetpack flame
+        const flameGeometry = new THREE.ConeGeometry(0.15, 0.4, 8);
+        const flameMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff6600,
+            transparent: true,
+            opacity: 0.7,
+        });
+        const flame = new THREE.Mesh(flameGeometry, flameMaterial);
+        flame.position.y = 0.3;
+        flame.position.z = -0.25;
+        flame.rotation.x = Math.PI; // Point downward
+        // Store reference to animate flame
+        workerGroup.userData.flame = flame;
+        workerGroup.add(flame);
+
+        // Arms
+        const armGeometry = new THREE.BoxGeometry(0.2, 0.6, 0.2);
+        const armMaterial = new THREE.MeshPhongMaterial({
+            color: 0xf0e68c,
+            specular: 0x111111,
+            shininess: 30
+        });
+
+        // Left arm
+        const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+        leftArm.position.set(-0.4, 0.8, 0);
+        workerGroup.add(leftArm);
+
+        // Right arm
+        const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+        rightArm.position.set(0.4, 0.8, 0);
+        workerGroup.add(rightArm);
+
+        // Legs
+        const legGeometry = new THREE.BoxGeometry(0.2, 0.6, 0.2);
+        const legMaterial = new THREE.MeshPhongMaterial({
+            color: 0xf0e68c,
+            specular: 0x111111,
+            shininess: 30
+        });
+
+        // Left leg
+        const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+        leftLeg.position.set(-0.2, 0.3, 0);
+        workerGroup.userData.leftLeg = leftLeg;
+        workerGroup.add(leftLeg);
+
+        // Right leg
+        const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+        rightLeg.position.set(0.2, 0.3, 0);
+        workerGroup.userData.rightLeg = rightLeg;
+        workerGroup.add(rightLeg);
+
+        // Create shadow
+        const shadowGeometry = new THREE.CircleGeometry(0.4, 16);
+        const shadowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: 0.3,
+            depthWrite: false
+        });
+        const shadow = new THREE.Mesh(shadowGeometry, shadowMaterial);
+        shadow.rotation.x = -Math.PI / 2; // Flat on the ground
+        shadow.position.y = 0.01; // Just above the floor
+        workerGroup.add(shadow);
+
+        // Set initial rotation
+        const initialDirection = Math.random() > 0.5 ? 1 : -1;
+        workerGroup.rotation.y = initialDirection > 0 ? 0 : Math.PI;
 
         // Store original position for animation
-        worker.userData = {
+        workerGroup.userData = {
             originalX: workerX,
             originalZ: workerZ,
-            direction: worker.rotation.y === 0 ? 1 : -1, // Match direction to rotation
-            speed: 0.002 + Math.random() * 0.004 // Much slower speed
+            direction: initialDirection,
+            speed: 0.004 + Math.random() * 0.003, // Slightly faster speed for better visibility
         };
 
-        workers.push(worker);
-        hallway.add(worker);
+        workers.push(workerGroup);
+        hallway.add(workerGroup);
     }
 
     // No need to start animation here - will be handled in the game loop
@@ -303,15 +472,36 @@ export const createHallway = () => {
 
 // Update workers animation - will be called from game loop
 export const updateWorkers = (delta) => {
-    workers.forEach(worker => {
+    workers.forEach(workerGroup => {
         // Move worker back and forth
-        worker.position.x += worker.userData.direction * worker.userData.speed * delta;
+        workerGroup.position.x += workerGroup.userData.direction * workerGroup.userData.speed * delta;
 
         // Change direction if too far from original position
-        if (Math.abs(worker.position.x - worker.userData.originalX) > 1.5) {
-            worker.userData.direction *= -1;
-            // Flip the worker to face the new direction
-            worker.rotation.y = (worker.userData.direction > 0) ? 0 : Math.PI;
+        if (Math.abs(workerGroup.position.x - workerGroup.userData.originalX) > 1.5) {
+            workerGroup.userData.direction *= -1;
+            // Rotate the entire group to face the new direction
+            workerGroup.rotation.y = (workerGroup.userData.direction > 0) ? 0 : Math.PI;
+        }
+
+        // Animate legs for walking motion
+        if (workerGroup.userData.leftLeg && workerGroup.userData.rightLeg) {
+            const walkSpeed = workerGroup.userData.speed * 15;
+            const walkTime = performance.now() * 0.005;
+
+            // Swing legs back and forth
+            workerGroup.userData.leftLeg.rotation.x = Math.sin(walkTime * walkSpeed) * 0.5;
+            workerGroup.userData.rightLeg.rotation.x = Math.sin(walkTime * walkSpeed + Math.PI) * 0.5;
+        }
+
+        // Animate jetpack flame
+        if (workerGroup.userData.flame) {
+            // Pulsate the flame size
+            const flameTime = performance.now() * 0.01;
+            const pulseScale = 0.8 + Math.sin(flameTime) * 0.2;
+            workerGroup.userData.flame.scale.set(pulseScale, pulseScale, pulseScale);
+
+            // Randomly adjust flame opacity for flicker effect
+            workerGroup.userData.flame.material.opacity = 0.5 + Math.random() * 0.3;
         }
     });
 }; 
