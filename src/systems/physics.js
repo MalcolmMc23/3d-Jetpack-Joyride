@@ -15,6 +15,9 @@ import { camera } from './sceneSetup.js';
 
 // Update player physics
 export const updatePlayerPhysics = (player, delta) => {
+    // Skip physics updates if in god mode
+    if (gameState.isGodMode) return;
+
     // Player physics (vertical movement with gradual jetpack acceleration)
     if (gameState.isAscending) {
         // Increase jetpack active time
@@ -60,15 +63,20 @@ export const updatePlayerPhysics = (player, delta) => {
     }
 
     // Update camera position (follows player height and horizontal position)
-    camera.position.y = player.position.y;
-    camera.position.x = player.position.x;
+    // Only update camera from player if not in god mode
+    if (!gameState.isGodMode) {
+        camera.position.y = player.position.y;
+        camera.position.x = player.position.x;
+    }
 };
 
 // Check for coin collisions
 export const checkCoinCollisions = (coins, delta, onCollect) => {
     coins.forEach(coin => {
-        // Move coin with game speed
-        coin.position.z += GAME_SPEED * delta;
+        // Move coin with game speed only if not paused
+        if (!gameState.isPaused) {
+            coin.position.z += GAME_SPEED * delta;
+        }
 
         // Check if coin passed the end of hallway
         if (coin.position.z > 10) {
@@ -81,8 +89,8 @@ export const checkCoinCollisions = (coins, delta, onCollect) => {
             coin.visible = true;
         }
 
-        // Check for collection (if coin is near player)
-        if (coin.visible && coin.position.z > -1 && coin.position.z < 1) {
+        // Check for collection (if coin is near player) - skip in god mode
+        if (!gameState.isGodMode && coin.visible && coin.position.z > -1 && coin.position.z < 1) {
             const dx = coin.position.x - camera.position.x;
             const dy = coin.position.y - camera.position.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
@@ -97,6 +105,9 @@ export const checkCoinCollisions = (coins, delta, onCollect) => {
 
 // Check for laser collisions
 export const checkLaserCollision = (laser, delta) => {
+    // Skip collision detection if in god mode
+    if (gameState.isGodMode) return false;
+
     // Get the laser's start and end points in world space
     const startPoint = laser.userData.startPoint.clone();
     const endPoint = laser.userData.endPoint.clone();

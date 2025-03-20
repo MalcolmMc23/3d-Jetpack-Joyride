@@ -54,19 +54,21 @@ export const createLasers = () => {
         const isFullWidth = Math.random() < 0.3; // 30% chance of full-width laser
         const isDiagonal = !isFullWidth && Math.random() < 0.3; // 30% chance of diagonal laser (if not full-width)
 
-        // Safe margins
-        const safeMarginX = 0.5; // Safe margin from walls
-        const safeMarginY = 0.5; // Safe margin from floor/ceiling
-        const safeMarginZ = 5; // Safe margin for z depth of diagonal lasers
+        // Increase safe margins to ensure all parts of the laser stay within bounds
+        // This accounts for the increased beam and node sizes
+        const safeMarginX = 1.0; // Increased from 0.5 to account for beam thickness and node radius
+        const safeMarginY = 1.0; // Increased from 0.5 to account for beam thickness and node radius
+        const safeMarginZ = 3.0; // Reduced from 5 to keep diagonal beams more within playable space
 
         let startX, startY, startZ, endX, endY, endZ, angle, length;
 
         if (isFullWidth) {
             // Create a laser that spans the full width of the hallway at a random height
+            // Ensure height is well within bounds to account for beam thickness
             startY = safeMarginY + Math.random() * (HALLWAY_HEIGHT - 2 * safeMarginY);
             endY = startY; // Same height (horizontal laser)
 
-            // Left-to-right laser
+            // Left-to-right laser with safe margins
             startX = -HALLWAY_WIDTH / 2 + safeMarginX;
             endX = HALLWAY_WIDTH / 2 - safeMarginX;
 
@@ -81,18 +83,18 @@ export const createLasers = () => {
             // Create a diagonal laser that points at the player (angled in Z direction)
             // Start with bottom point further away, top point closer to player
 
-            // Random X position within safe bounds
-            const centerX = (Math.random() - 0.5) * (HALLWAY_WIDTH - 2 * safeMarginX);
+            // Keep X position more centered to avoid extending outside bounds
+            const centerX = (Math.random() - 0.5) * (HALLWAY_WIDTH - 2 * safeMarginX * 1.5);
 
             // Bottom point (further from player)
             startX = centerX;
             startY = safeMarginY + Math.random() * 2; // Lower position
-            startZ = -safeMarginZ; // Further away from player
+            startZ = -safeMarginZ; // Further away from player but reduced
 
             // Top point (closer to player)
-            endX = centerX;
+            endX = centerX; // Same X to keep beam vertical in XY plane
             endY = HALLWAY_HEIGHT - safeMarginY - Math.random() * 2; // Higher position
-            endZ = safeMarginZ; // Closer to player
+            endZ = safeMarginZ; // Closer to player but reduced
 
             // Calculate the actual distance between points for proper beam length
             length = Math.sqrt(
@@ -106,11 +108,13 @@ export const createLasers = () => {
         } else {
             // Create a shorter laser with random angle and position (regular 2D laser)
             angle = Math.random() * Math.PI; // Random angle
-            length = Math.random() * 3 + 2; // Random length
 
-            // Constrain startX to ensure it's not too close to walls
-            startX = (Math.random() - 0.5) * (HALLWAY_WIDTH - 2 * safeMarginX);
-            startY = safeMarginY + Math.random() * (HALLWAY_HEIGHT - 2 * safeMarginY);
+            // Create a shorter laser to ensure it stays within bounds
+            length = Math.random() * 2 + 1; // Reduced from 3+2 to 2+1 for better boundary control
+
+            // Constrain startX to ensure it's not too close to walls - more conservative
+            startX = (Math.random() - 0.5) * (HALLWAY_WIDTH - 2 * safeMarginX * 1.5);
+            startY = safeMarginY * 1.2 + Math.random() * (HALLWAY_HEIGHT - 2 * safeMarginY * 1.5);
             startZ = 0;
 
             // Calculate the endpoint with angle and length
@@ -118,17 +122,34 @@ export const createLasers = () => {
             endY = startY + Math.sin(angle) * length;
             endZ = 0;
 
-            // Check if endpoint is outside bounds and fix if needed
+            // Check and fix if endpoint is outside bounds - more aggressive clamping
             if (endX < -HALLWAY_WIDTH / 2 + safeMarginX) {
+                // Recalculate angle and length to fit within bounds
                 endX = -HALLWAY_WIDTH / 2 + safeMarginX;
+                const dy = endY - startY;
+                const dx = endX - startX;
+                angle = Math.atan2(dy, dx);
+                length = Math.sqrt(dx * dx + dy * dy);
             } else if (endX > HALLWAY_WIDTH / 2 - safeMarginX) {
                 endX = HALLWAY_WIDTH / 2 - safeMarginX;
+                const dy = endY - startY;
+                const dx = endX - startX;
+                angle = Math.atan2(dy, dx);
+                length = Math.sqrt(dx * dx + dy * dy);
             }
 
             if (endY < safeMarginY) {
                 endY = safeMarginY;
+                const dy = endY - startY;
+                const dx = endX - startX;
+                angle = Math.atan2(dy, dx);
+                length = Math.sqrt(dx * dx + dy * dy);
             } else if (endY > HALLWAY_HEIGHT - safeMarginY) {
                 endY = HALLWAY_HEIGHT - safeMarginY;
+                const dy = endY - startY;
+                const dx = endX - startX;
+                angle = Math.atan2(dy, dx);
+                length = Math.sqrt(dx * dx + dy * dy);
             }
         }
 
@@ -143,11 +164,11 @@ export const createLasers = () => {
 
         // Create laser beam using BoxGeometry instead of cylinder
         // This gives us more control over orientation
-        const laserGeometry = new THREE.BoxGeometry(length, 0.1, 0.1);
+        const laserGeometry = new THREE.BoxGeometry(length, 0.3, 0.3);
         const laser = new THREE.Mesh(laserGeometry, laserMaterial);
 
         // Create outer glow using BoxGeometry as well
-        const outerGlowGeometry = new THREE.BoxGeometry(length, 0.3, 0.3);
+        const outerGlowGeometry = new THREE.BoxGeometry(length, 0.6, 0.6);
         const outerGlow = new THREE.Mesh(outerGlowGeometry, outerGlowMaterial);
 
         if (!isDiagonal) {
@@ -200,7 +221,7 @@ export const createLasers = () => {
         }
 
         // Create glowing nodes at each end
-        const nodeGeometry = new THREE.SphereGeometry(0.25, 16, 16);
+        const nodeGeometry = new THREE.SphereGeometry(0.4, 16, 16);
         const startNode = new THREE.Mesh(nodeGeometry, nodeMaterial);
         const endNode = new THREE.Mesh(nodeGeometry, nodeMaterial);
 
@@ -208,7 +229,7 @@ export const createLasers = () => {
         endNode.position.set(endX, endY, endZ);
 
         // Add spiky glow effect to nodes
-        const spikeGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+        const spikeGeometry = new THREE.SphereGeometry(0.7, 16, 16);
         const startSpike = new THREE.Mesh(spikeGeometry, spikeMaterial);
         const endSpike = new THREE.Mesh(spikeGeometry, spikeMaterial);
 
@@ -216,7 +237,7 @@ export const createLasers = () => {
         endSpike.position.set(endX, endY, endZ);
 
         // Add outer glow for nodes
-        const nodeGlowGeometry = new THREE.SphereGeometry(0.7, 16, 16);
+        const nodeGlowGeometry = new THREE.SphereGeometry(0.9, 16, 16);
         const startNodeGlow = new THREE.Mesh(nodeGlowGeometry, outerGlowMaterial);
         const endNodeGlow = new THREE.Mesh(nodeGlowGeometry, outerGlowMaterial);
 
